@@ -53,26 +53,39 @@ export class OrdersService {
       const productDetails = await Promise.all(
         products.map(async (product) => {
           const dbProduct = await this.productRepository.findOne({
-            where: { id: product.product_id },
+            where: { id: product.id },
           });
           if (!dbProduct) {
             throw new NotFoundException(
-              `Product with ID ${product.product_id} not found`,
+              `Product with ID ${product.id} not found`,
             );
           }
-          if (dbProduct.stock < product.quantity) {
+
+          // Check stock for variations
+          if (product.size) {
+            const variation = dbProduct.variations.find(
+              (v) => v.size === product.size,
+            );
+            if (!variation || variation.stock < product.quantity) {
+              throw new NotFoundException(
+                `Insufficient stock for product ${dbProduct.name} (${product.size})`,
+              );
+            }
+          } else if (dbProduct.stock < product.quantity) {
             throw new NotFoundException(
               `Insufficient stock for product ${dbProduct.name}`,
             );
           }
-          total_amount += dbProduct.price * product.quantity;
+
+          total_amount += product.price * product.quantity;
           return {
             id: dbProduct.id,
             name: dbProduct.name,
             quantity: product.quantity,
-            price: dbProduct.price,
+            price: product.price,
             stock: dbProduct.stock,
             lowStockAlert: dbProduct.lowStockAlert,
+            size: product.size, // Include size for variations
           };
         }),
       );
@@ -103,11 +116,11 @@ export class OrdersService {
       this.notificationsGateway.notifyUser(
         savedOrder.user.id,
         `Your order #${savedOrder.id} has been placed successfully.`,
-        'order_update', // Add type argument
+        'order_update',
       );
       this.notificationsGateway.notifyAdmins(
         `New order #${savedOrder.id} placed by user ${savedOrder.user.id}.`,
-        'order_update', // Add type argument
+        'order_update',
       );
 
       return savedOrder;

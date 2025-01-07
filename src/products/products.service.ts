@@ -5,11 +5,12 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, Between } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Product } from './product.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { Category } from '../categories/category.entity';
-import { PricingService } from '../pricing/pricing.service';
+import { I18nService } from 'nestjs-i18n';
+import { TranslationsService } from '../translations/translations.service';
 
 @Injectable()
 export class ProductsService {
@@ -20,13 +21,21 @@ export class ProductsService {
     private productRepository: Repository<Product>,
     @InjectRepository(Category)
     private categoryRepository: Repository<Category>,
-    private pricingService: PricingService,
+    private readonly i18n: I18nService,
+    private readonly translationsService: TranslationsService,
   ) {}
 
   async create(createProductDto: CreateProductDto): Promise<Product> {
     try {
-      const { name, description, price, stock, imageUrl, categoryId } =
-        createProductDto;
+      const {
+        name,
+        description,
+        price,
+        stock,
+        imageUrl,
+        categoryId,
+        variations,
+      } = createProductDto;
 
       this.logger.log(
         `Creating product with DTO: ${JSON.stringify(createProductDto)}`,
@@ -41,6 +50,7 @@ export class ProductsService {
 
       this.logger.log(`Found category: ${JSON.stringify(category)}`);
 
+      // Create the product entity
       const product = this.productRepository.create({
         name,
         description,
@@ -48,8 +58,10 @@ export class ProductsService {
         stock,
         imageUrl,
         category,
+        variations, // Add variations
       });
 
+      // Save the product
       const savedProduct = await this.productRepository.save(product);
 
       this.logger.log(
@@ -62,7 +74,6 @@ export class ProductsService {
         `Failed to create product: ${error.message}`,
         error.stack,
       );
-
       throw new InternalServerErrorException('Failed to create product');
     }
   }
@@ -74,12 +85,7 @@ export class ProductsService {
         throw new NotFoundException('Product not found');
       }
 
-      // Apply dynamic pricing
-      product.price = await this.pricingService.calculateDynamicPrice(product); // Await the result
-
-      this.logger.log(
-        `Fetched product with dynamic pricing: ${JSON.stringify(product)}`,
-      );
+      this.logger.log(`Fetched product: ${JSON.stringify(product)}`);
 
       return product;
     } catch (error) {
@@ -87,7 +93,6 @@ export class ProductsService {
         `Failed to fetch product: ${error.message}`,
         error.stack,
       );
-
       throw new InternalServerErrorException('Failed to fetch product');
     }
   }
@@ -145,5 +150,27 @@ export class ProductsService {
       this.logger.error(`Failed to fetch products:`, error.stack);
       throw new InternalServerErrorException('Failed to fetch product');
     }
+  }
+
+  async getProductDetails(productId: number, lang: string): Promise<Product> {
+    const product = await this.productRepository.findOne({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    // Apply translations to the product name and description
+    product.name = await this.translationsService.getTranslation(
+      'product.name',
+      lang,
+    );
+    product.description = await this.translationsService.getTranslation(
+      'product.description',
+      lang,
+    );
+
+    return product;
   }
 }

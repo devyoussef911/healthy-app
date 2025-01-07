@@ -12,13 +12,17 @@ import { Type } from 'class-transformer';
 
 class ProductDto {
   @IsNumber()
-  product_id: number;
+  id: number; // Change from product_id to id
 
   @IsNumber()
   quantity: number;
 
   @IsDecimal()
   price: number;
+
+  @IsOptional()
+  @IsString()
+  size?: string; // Add size for variations
 }
 
 export class CreateOrderDto {

@@ -1,4 +1,11 @@
-import { IsNotEmpty, IsNumber, IsString, IsUrl, Min } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsString,
+  IsUrl,
+  Min,
+  IsArray,
+} from 'class-validator';
 
 export class CreateProductDto {
   @IsNotEmpty()
@@ -25,5 +32,12 @@ export class CreateProductDto {
 
   @IsNotEmpty()
   @IsNumber()
-  categoryId: number; // Validate categoryId instead of the relationship
+  categoryId: number;
+
+  @IsArray()
+  variations: Array<{
+    size: string;
+    price: number;
+    stock: number;
+  }>; // Add this field
 }

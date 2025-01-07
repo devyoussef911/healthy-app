@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+
 import { InventoryController } from './inventory.controller';
 
 describe('InventoryController', () => {

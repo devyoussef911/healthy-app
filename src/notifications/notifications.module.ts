@@ -1,4 +1,3 @@
-// src/notifications/notifications.module.ts (updated)
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { NotificationsGateway } from './notifications.gateway';
@@ -14,6 +13,6 @@ import { User } from '../users/user.entity';
     NotificationsService,
     NotificationChannelsService,
   ],
-  exports: [NotificationsGateway, NotificationsService],
+  exports: [NotificationsGateway, NotificationsService], // Export NotificationsGateway
 })
 export class NotificationsModule {}

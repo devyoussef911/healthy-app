@@ -1,13 +1,15 @@
-// src/notifications/notifications.service.ts (updated)
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Notification } from './notification.entity';
 import { User } from '../users/user.entity';
 import { NotificationChannelsService } from './notification-channels.service';
+import { UserRole } from '../users/enums/user-role.enum'; // Import UserRole
 
 @Injectable()
 export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name); // Initialize Logger
+
   constructor(
     @InjectRepository(Notification)
     private notificationRepository: Repository<Notification>,
@@ -30,19 +32,31 @@ export class NotificationsService {
     const savedNotification =
       await this.notificationRepository.save(notification);
 
-    // Send email notification
-    await this.notificationChannelsService.sendEmail(
-      user.email,
-      'Order Update',
-      message,
-    );
-    savedNotification.emailSent = true;
+    try {
+      await this.notificationChannelsService.sendEmail(
+        user.email,
+        'Custom Notification',
+        message,
+      );
+      savedNotification.emailSent = true;
+    } catch (error) {
+      this.logger.error(
+        `Failed to send email to ${user.email}: ${error.message}`,
+      );
+    }
 
-    // Send SMS notification
-    await this.notificationChannelsService.sendSms(user.mobileNumber, message); // Use mobileNumber
-    savedNotification.smsSent = true;
+    try {
+      await this.notificationChannelsService.sendSms(
+        user.mobileNumber,
+        message,
+      );
+      savedNotification.smsSent = true;
+    } catch (error) {
+      this.logger.error(
+        `Failed to send SMS to ${user.mobileNumber}: ${error.message}`,
+      );
+    }
 
-    // Update the notification with delivery status
     return this.notificationRepository.save(savedNotification);
   }
 
@@ -51,5 +65,13 @@ export class NotificationsService {
       where: { user: { id: userId } },
       order: { createdAt: 'DESC' },
     });
+  }
+
+  async getUserById(userId: number): Promise<User> {
+    return this.userRepository.findOne({ where: { id: userId } });
+  }
+
+  async getAdmins(): Promise<User[]> {
+    return this.userRepository.find({ where: { role: UserRole.ADMIN } });
   }
 }

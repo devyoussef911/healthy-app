@@ -15,6 +15,12 @@ export class PricingRule {
   @Column({ nullable: true })
   threshold: number; // Only for 'low_stock' condition
 
+  @Column({ type: 'timestamp', nullable: true })
+  startTime: Date; // Add this field
+
+  @Column({ type: 'timestamp', nullable: true })
+  endTime: Date; // Add this field
+
   @ManyToOne(() => Product, (product) => product.pricingRules)
   product: Product;
 }

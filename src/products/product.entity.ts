@@ -6,7 +6,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { Category } from '../categories/category.entity';
-import { PricingRule } from '../pricing/pricing-rule.entity'; // Import PricingRule
+import { PricingRule } from '../pricing/pricing-rule.entity';
 import {
   IsNotEmpty,
   IsNumber,
@@ -14,6 +14,7 @@ import {
   IsUrl,
   Min,
   IsBoolean,
+  IsArray,
 } from 'class-validator';
 
 @Entity()
@@ -54,12 +55,20 @@ export class Product {
   @Column()
   @IsNotEmpty()
   @IsNumber()
-  categoryId: number; // Ensure this is validated in the DTO
+  categoryId: number;
 
   @Column({ default: false })
   @IsBoolean()
-  lowStockAlert: boolean; // Track if a low stock alert has been sent
+  lowStockAlert: boolean;
 
   @OneToMany(() => PricingRule, (pricingRule) => pricingRule.product)
-  pricingRules: PricingRule[]; // Add this line
+  pricingRules: PricingRule[];
+
+  @Column('jsonb', { nullable: true })
+  @IsArray()
+  variations: Array<{
+    size: string;
+    price: number;
+    stock: number;
+  }>; // Add this property
 }

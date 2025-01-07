@@ -1,10 +1,17 @@
 // src/analytics/analytics.controller.ts
+
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+
 import { AnalyticsService } from './analytics.service';
+
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+
 import { RolesGuard } from '../common/guards/roles.guard';
+
 import { Roles } from '../common/decorators/roles.decorator';
+
 import { UserRole } from '../users/enums/user-role.enum';
+
 import {
   GetOrderAnalyticsDto,
   GetRevenueAnalyticsDto,

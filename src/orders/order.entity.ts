@@ -1,4 +1,3 @@
-// src/orders/order.entity.ts (updated)
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -35,8 +34,9 @@ export class Order {
     name: string;
     quantity: number;
     price: number;
-    stock: number; // Add stock
-    lowStockAlert: boolean; // Add lowStockAlert
+    stock: number;
+    lowStockAlert: boolean;
+    size?: string; // Add size for variations
   }[];
 
   @Column('decimal', { precision: 10, scale: 2 })
@@ -47,16 +47,16 @@ export class Order {
   @Column()
   @IsNotEmpty()
   @IsString()
-  payment_method: string; // e.g., 'online' or 'cod'
+  payment_method: string;
 
   @Column({ nullable: true })
   @IsString()
-  delivery_time: string; // Optional for "later" orders
+  delivery_time: string;
 
   @Column({ default: OrderStatus.PENDING })
   @IsNotEmpty()
   @IsEnum(OrderStatus)
-  status: OrderStatus; // Use the OrderStatus enum
+  status: OrderStatus;
 
   @CreateDateColumn()
   createdAt: Date;

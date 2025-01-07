@@ -12,17 +12,23 @@ import {
   NotFoundException,
   ParseIntPipe,
   DefaultValuePipe,
+  Req,
 } from '@nestjs/common';
 import { ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { Product } from './product.entity';
 import { SearchProductsDto } from './dto/search-products.dto';
+import { I18nService } from 'nestjs-i18n';
+import { IRequestWithLang } from '../types/request.types'; // Import the custom interface
 
 @ApiTags('products')
-@Controller('products')
+@Controller(':lang/products')
 export class ProductsController {
-  constructor(private productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+    private readonly i18n: I18nService,
+  ) {}
 
   @Post()
   @UsePipes(new ValidationPipe({ transform: true }))
@@ -50,19 +56,12 @@ export class ProductsController {
   @Get(':id')
   @ApiResponse({ status: 200, description: 'Product found', type: Product })
   @ApiResponse({ status: 404, description: 'Product not found' })
-  async findOne(@Param('id') id: number): Promise<Product> {
-    try {
-      return await this.productsService.findOne(id);
-    } catch (error) {
-      throw new HttpException(
-        {
-          status: HttpStatus.BAD_REQUEST,
-          error: 'Failed to fetch product',
-          details: error.message,
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+  async findOne(
+    @Param('id') id: number,
+    @Req() req: IRequestWithLang,
+  ): Promise<Product> {
+    const lang = req.i18nLang || 'en'; // Get the language from the request object
+    return this.productsService.getProductDetails(id, lang);
   }
 
   @Get('search')

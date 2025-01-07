@@ -7,10 +7,8 @@ import { PricingRule } from './pricing-rule.entity';
 @Injectable()
 export class PricingService {
   constructor(
-    @InjectRepository(Product)
-    private productRepository: Repository<Product>,
     @InjectRepository(PricingRule)
-    private pricingRuleRepository: Repository<PricingRule>, // Inject PricingRuleRepository
+    private pricingRuleRepository: Repository<PricingRule>,
   ) {}
 
   async calculateDynamicPrice(product: Product): Promise<number> {
@@ -18,12 +16,12 @@ export class PricingService {
 
     // Fetch dynamic pricing rules for the product
     const pricingRules = await this.pricingRuleRepository.find({
-      where: { product: { id: product.id } }, // Use the product relation
+      where: { product: { id: product.id } },
     });
 
     // Apply pricing rules
     for (const rule of pricingRules) {
-      if (rule.condition === 'peak_hours' && this.isPeakHour()) {
+      if (rule.condition === 'peak_hours' && this.isPeakHour(rule)) {
         price *= rule.multiplier;
       } else if (
         rule.condition === 'low_stock' &&
@@ -36,8 +34,18 @@ export class PricingService {
     return parseFloat(price.toFixed(2)); // Round to 2 decimal places
   }
 
-  private isPeakHour(): boolean {
-    const currentHour = new Date().getHours();
-    return currentHour >= 12 && currentHour <= 18; // Example peak hours
+  private isPeakHour(rule: PricingRule): boolean {
+    const now = new Date();
+    const currentHour = now.getHours();
+
+    // Check if the current time is within the rule's startTime and endTime
+    if (rule.startTime && rule.endTime) {
+      const startHour = new Date(rule.startTime).getHours();
+      const endHour = new Date(rule.endTime).getHours();
+      return currentHour >= startHour && currentHour <= endHour;
+    }
+
+    // Default peak hours (12 PM to 6 PM)
+    return currentHour >= 12 && currentHour <= 18;
   }
 }

@@ -8,13 +8,18 @@ import {
   UseGuards,
   Req,
 } from '@nestjs/common';
+
 import { UsersService } from './users.service';
+
 import { CreateUserDto } from './dto/create-user.dto';
+
 import { AuthGuard } from '@nestjs/passport';
+
 import { Request } from 'express';
+
 import { Roles } from '../common/decorators/roles.decorator'; // Import the Roles decorator
 
-@Controller('users')
+@Controller(':lang/users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -26,6 +31,7 @@ export class UsersController {
       if (error instanceof ConflictException) {
         throw new ConflictException(error.message);
       }
+
       throw new InternalServerErrorException('Something went wrong');
     }
   }
@@ -35,6 +41,7 @@ export class UsersController {
   @Roles('user', 'admin') // Restrict to users with 'user' or 'admin' role
   getProfile(@Req() req: Request) {
     // Return the authenticated user's details
+
     return req.user;
   }
 }
