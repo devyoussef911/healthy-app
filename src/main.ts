@@ -1,16 +1,12 @@
 import { NestFactory, Reflector } from '@nestjs/core';
-
 import { AppModule } from './app.module';
-
 import { RolesGuard } from './common/guards/roles.guard';
-
-import { ValidationPipe } from '@nestjs/common'; // Import ValidationPipe
-
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'; // Import Swagger
-
-import helmet from 'helmet'; // Correct import for Helmet
-
-import rateLimit from 'express-rate-limit'; // Correct import for rate limiting
+import { ValidationPipe } from '@nestjs/common';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import { Server } from 'http';
+import { createServer, proxy } from 'vercel-node-server';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -32,41 +28,33 @@ async function bootstrap() {
   );
 
   // Global Validation
-
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true, // Strip non-whitelisted properties
-
       forbidNonWhitelisted: true, // Throw errors for non-whitelisted properties
-
       transform: true, // Automatically transform payloads to DTO instances
     }),
   );
 
+  if (process.env.VERCEL) {
+    const server = await createServer();
+    proxy(server, app.getHttpAdapter().getInstance());
+  } else {
+    await app.listen(3000);
+  }
+
   // Global Guards
-
   const reflector = new Reflector();
-
   app.useGlobalGuards(new RolesGuard(reflector)); // Register RolesGuard globally
-
   // Swagger Documentation
-
   const config = new DocumentBuilder()
-
     .setTitle('Healthy Milk Products API')
-
     .setDescription('API for managing milk product orders')
-
     .setVersion('1.0')
-
     .addBearerAuth() // Add JWT authentication support
-
     .build();
-
   const document = SwaggerModule.createDocument(app, config);
-
   SwaggerModule.setup('api', app, document); // Serve Swagger at /api
-
   await app.listen(3000);
 }
 
