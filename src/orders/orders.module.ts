@@ -8,10 +8,12 @@ import { User } from '../users/user.entity';
 import { Product } from '../products/product.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { InventoryModule } from '../inventory/inventory.module'; // Import InventoryModule
+import { City } from 'src/locations/city.entity';
+import { Area } from 'src/locations/area.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, User, Product]), // Ensure entities are imported
+    TypeOrmModule.forFeature([Order, User, Product, City, Area]), // Ensure entities are imported
     NotificationsModule,
     InventoryModule, // Import InventoryModule
   ],

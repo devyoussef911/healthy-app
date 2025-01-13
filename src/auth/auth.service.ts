@@ -15,20 +15,16 @@ export class AuthService {
   ) {}
 
   async validateUser(email: string, password: string): Promise<any> {
-    const user = await this.usersService.findByEmail(email);
-
+    const user = await this.usersService.findByEmail(email); // Ensure role is retrieved
     if (user && (await bcrypt.compare(password, user.passwordHash))) {
-      const { passwordHash, ...result } = user; // Destructure to remove passwordHash
-
+      const { passwordHash, ...result } = user; // Exclude sensitive data
       return result;
     }
-
     return null;
   }
 
   async login(user: any) {
-    const payload = { email: user.email, sub: user.id };
-
+    const payload = { email: user.email, sub: user.id, role: user.role }; // Add role to payload
     return {
       access_token: this.jwtService.sign(payload),
     };

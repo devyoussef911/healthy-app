@@ -1,56 +1,56 @@
 import {
-  IsArray,
-  IsDecimal,
-  IsEnum,
   IsNotEmpty,
+  IsArray,
   IsNumber,
-  IsOptional,
   IsString,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class ProductDto {
+  @IsNotEmpty()
   @IsNumber()
-  id: number; // Change from product_id to id
+  id: number;
 
+  @IsNotEmpty()
   @IsNumber()
   quantity: number;
 
-  @IsDecimal()
+  @IsNotEmpty()
+  @IsNumber()
   price: number;
 
-  @IsOptional()
   @IsString()
-  size?: string; // Add size for variations
+  size?: string; // Optional field for variations
 }
 
 export class CreateOrderDto {
+  @IsNotEmpty()
   @IsNumber()
-  @IsNotEmpty()
-  userId: number;
+  city: number; // Match service field name
 
-  @IsString()
   @IsNotEmpty()
-  city: string;
+  @IsNumber()
+  area: number;
 
-  @IsString()
   @IsNotEmpty()
-  area: string;
+  @IsNumber()
+  userId: number; // Match service field name
 
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ProductDto)
   products: ProductDto[];
 
-  @IsDecimal()
-  total_amount: number;
+  @IsNotEmpty()
+  @IsNumber()
+  totalAmount: number;
 
+  @IsNotEmpty()
   @IsString()
-  @IsEnum(['online', 'cod'])
-  payment_method: string;
+  paymentMethod: string; // Correct name to match service usage
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
-  delivery_time?: string; // Optional for "later" orders
+  deliveryTime: string; // Correct name to match service usage
 }

@@ -1,0 +1,18 @@
+{
+  "product": {
+    "name": "Name",
+    "description": "Description",
+    "price": "Price",
+    "stock": "Stock"
+  },
+  "order": {
+    "status": {
+      "pending": "Pending",
+      "accepted": "Accepted",
+      "preparing": "Preparing",
+      "out_for_delivery": "Out for Delivery",
+      "delivered": "Delivered",
+      "cancelled": "Cancelled"
+    }
+  }
+}

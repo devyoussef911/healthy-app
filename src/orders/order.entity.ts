@@ -5,27 +5,28 @@ import {
   ManyToOne,
   JoinColumn,
   CreateDateColumn,
+  UpdateDateColumn,
   OneToMany,
 } from 'typeorm';
 import { User } from '../users/user.entity';
 import { IsNotEmpty, IsNumber, IsString, IsEnum } from 'class-validator';
 import { OrderStatus } from './enums/order-status.enum';
 import { Feedback } from '../feedback/feedback.entity';
+import { City } from '../locations/city.entity';
+import { Area } from '../locations/area.entity';
 
 @Entity()
 export class Order {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
-  @IsNotEmpty()
-  @IsString()
-  city: string;
+  @ManyToOne(() => City, (city) => city.orders)
+  @JoinColumn({ name: 'city_id' })
+  city: City;
 
-  @Column()
-  @IsNotEmpty()
-  @IsString()
-  area: string;
+  @ManyToOne(() => Area, (area) => area.orders)
+  @JoinColumn({ name: 'area_id' })
+  area: Area;
 
   @Column('jsonb')
   @IsNotEmpty()
@@ -36,7 +37,7 @@ export class Order {
     price: number;
     stock: number;
     lowStockAlert: boolean;
-    size?: string; // Add size for variations
+    size?: string;
   }[];
 
   @Column('decimal', { precision: 10, scale: 2 })
@@ -49,22 +50,23 @@ export class Order {
   @IsString()
   payment_method: string;
 
-  @Column({ nullable: true })
-  @IsString()
-  delivery_time: string;
-
-  @Column({ default: OrderStatus.PENDING })
-  @IsNotEmpty()
+  @Column({ type: 'enum', enum: OrderStatus })
   @IsEnum(OrderStatus)
   status: OrderStatus;
 
-  @CreateDateColumn()
-  createdAt: Date;
+  @OneToMany(() => Feedback, (feedback) => feedback.order)
+  feedback: Feedback[];
 
   @ManyToOne(() => User, (user) => user.orders)
-  @JoinColumn({ name: 'userId' })
+  @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @OneToMany(() => Feedback, (feedback) => feedback.order)
-  feedbacks: Feedback[];
+  @CreateDateColumn({ type: 'timestamp' })
+  created_at: Date;
+
+  @UpdateDateColumn({ type: 'timestamp' })
+  updated_at: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  delivery_time: Date;
 }

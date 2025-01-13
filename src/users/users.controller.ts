@@ -2,22 +2,16 @@ import {
   Controller,
   Post,
   Body,
-  ConflictException,
-  InternalServerErrorException,
-  Get,
+  Put,
+  Param,
   UseGuards,
   Req,
+  ForbiddenException,
 } from '@nestjs/common';
-
 import { UsersService } from './users.service';
-
 import { CreateUserDto } from './dto/create-user.dto';
-
-import { AuthGuard } from '@nestjs/passport';
-
-import { Request } from 'express';
-
-import { Roles } from '../common/decorators/roles.decorator'; // Import the Roles decorator
+import { UpdateUserDto } from './dto/update.user.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller(':lang/users')
 export class UsersController {
@@ -28,20 +22,25 @@ export class UsersController {
     try {
       return await this.usersService.create(createUserDto);
     } catch (error) {
-      if (error instanceof ConflictException) {
-        throw new ConflictException(error.message);
+      if (error.code === '23505') {
+        throw new ForbiddenException('Email or mobile number already exists');
       }
-
-      throw new InternalServerErrorException('Something went wrong');
+      throw error;
     }
   }
 
-  @Get('profile')
-  @UseGuards(AuthGuard('jwt')) // Protect this route with JWT
-  @Roles('user', 'admin') // Restrict to users with 'user' or 'admin' role
-  getProfile(@Req() req: Request) {
-    // Return the authenticated user's details
-
-    return req.user;
+  @Put(':id')
+  @UseGuards(JwtAuthGuard)
+  async updateUser(
+    @Param('id') id: string,
+    @Body() updateUserDto: UpdateUserDto,
+    @Req() req: any,
+  ) {
+    if (req.user.id !== parseInt(id, 10) && req.user.role !== 'admin') {
+      throw new ForbiddenException(
+        'You do not have permission to update this profile',
+      );
+    }
+    return this.usersService.updateUser(parseInt(id, 10), updateUserDto);
   }
 }

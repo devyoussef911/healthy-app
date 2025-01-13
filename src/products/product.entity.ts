@@ -16,6 +16,7 @@ import {
   IsBoolean,
   IsArray,
 } from 'class-validator';
+import { Order } from 'src/orders/order.entity';
 
 @Entity()
 export class Product {
@@ -63,6 +64,8 @@ export class Product {
 
   @OneToMany(() => PricingRule, (pricingRule) => pricingRule.product)
   pricingRules: PricingRule[];
+  @OneToMany(() => Order, (order) => order.products)
+  orders: Order[];
 
   @Column('jsonb', { nullable: true })
   @IsArray()
@@ -70,5 +73,5 @@ export class Product {
     size: string;
     price: number;
     stock: number;
-  }>; // Add this property
+  }>;
 }

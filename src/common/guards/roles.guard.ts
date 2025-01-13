@@ -20,15 +20,18 @@ export class RolesGuard implements CanActivate {
       context.getHandler(),
     );
 
+    // Log required roles for debugging
+    this.logger.log(`Required Roles: ${requiredRoles}`);
+
     if (!requiredRoles) {
-      return true; // No roles required, allow access
+      return true; // Allow access if no roles are required
     }
 
     const request = context.switchToHttp().getRequest();
     const user = request.user;
 
-    // Log the user object for debugging
-    this.logger.log(`User object: ${JSON.stringify(user)}`);
+    // Log user object for debugging
+    this.logger.log(`User: ${JSON.stringify(user)}`);
 
     if (!user || !requiredRoles.includes(user.role)) {
       throw new ForbiddenException(

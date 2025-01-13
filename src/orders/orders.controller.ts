@@ -23,7 +23,7 @@ import { ApiBearerAuth, ApiQuery, ApiTags, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('Orders')
 @ApiBearerAuth()
-@Controller('orders')
+@Controller(':lang/orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 

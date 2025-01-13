@@ -15,6 +15,8 @@ import { Product } from '../products/product.entity';
 import { OrderStatus } from './enums/order-status.enum';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { InventoryService } from '../inventory/inventory.service';
+import { City } from 'src/locations/city.entity';
+import { Area } from 'src/locations/area.entity';
 
 @Injectable()
 export class OrdersService {
@@ -25,6 +27,10 @@ export class OrdersService {
     private orderRepository: Repository<Order>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(City)
+    private readonly cityRepository: Repository<City>,
+    @InjectRepository(Area)
+    private readonly areaRepository: Repository<Area>,
     @InjectRepository(Product)
     private productRepository: Repository<Product>,
     @Inject(NotificationsGateway)
@@ -34,13 +40,8 @@ export class OrdersService {
 
   async create(createOrderDto: CreateOrderDto): Promise<Order> {
     try {
-      const { userId, products, city, area, payment_method, delivery_time } =
+      const { userId, city, area, products, paymentMethod, deliveryTime } =
         createOrderDto;
-
-      // Log the incoming DTO
-      this.logger.log(
-        `Creating order with DTO: ${JSON.stringify(createOrderDto)}`,
-      );
 
       // Find the user
       const user = await this.userRepository.findOne({ where: { id: userId } });
@@ -48,7 +49,22 @@ export class OrdersService {
         throw new NotFoundException('User not found');
       }
 
-      // Validate products and calculate total amount
+      // Find city and area
+      const cityEntity = await this.cityRepository.findOne({
+        where: { id: city },
+      });
+      if (!cityEntity) {
+        throw new NotFoundException('City not found');
+      }
+
+      const areaEntity = await this.areaRepository.findOne({
+        where: { id: area },
+      });
+      if (!areaEntity) {
+        throw new NotFoundException('Area not found');
+      }
+
+      // Validate products
       let total_amount = 0;
       const productDetails = await Promise.all(
         products.map(async (product) => {
@@ -61,63 +77,39 @@ export class OrdersService {
             );
           }
 
-          // Check stock for variations
-          if (product.size) {
-            const variation = dbProduct.variations.find(
-              (v) => v.size === product.size,
-            );
-            if (!variation || variation.stock < product.quantity) {
-              throw new NotFoundException(
-                `Insufficient stock for product ${dbProduct.name} (${product.size})`,
-              );
-            }
-          } else if (dbProduct.stock < product.quantity) {
+          // Check stock
+          if (dbProduct.stock < product.quantity) {
             throw new NotFoundException(
               `Insufficient stock for product ${dbProduct.name}`,
             );
           }
 
           total_amount += product.price * product.quantity;
-          return {
-            id: dbProduct.id,
-            name: dbProduct.name,
-            quantity: product.quantity,
-            price: product.price,
-            stock: dbProduct.stock,
-            lowStockAlert: dbProduct.lowStockAlert,
-            size: product.size, // Include size for variations
-          };
+          return { ...product, name: dbProduct.name, stock: dbProduct.stock };
         }),
       );
 
       // Create and save the order
-      const order = this.orderRepository.create({
+      const createdOrder = this.orderRepository.create({
         user,
-        city,
-        area,
+        city: cityEntity,
+        area: areaEntity,
         products: productDetails,
         total_amount,
-        payment_method,
-        delivery_time,
+        payment_method: paymentMethod,
+        delivery_time: new Date(deliveryTime),
         status: OrderStatus.PENDING,
       });
 
-      const savedOrder = await this.orderRepository.save(order);
+      const savedOrder = await this.orderRepository.save(createdOrder);
 
-      // Update inventory and check for low stock alerts
-      await this.inventoryService.updateInventory(savedOrder.id);
-
-      // Log the saved order
-      this.logger.log(
-        `Order created successfully: ${JSON.stringify(savedOrder)}`,
-      );
-
-      // Notify the user and admins
+      // Notify user and admins
       this.notificationsGateway.notifyUser(
         savedOrder.user.id,
         `Your order #${savedOrder.id} has been placed successfully.`,
         'order_update',
       );
+
       this.notificationsGateway.notifyAdmins(
         `New order #${savedOrder.id} placed by user ${savedOrder.user.id}.`,
         'order_update',
@@ -125,7 +117,6 @@ export class OrdersService {
 
       return savedOrder;
     } catch (error) {
-      // Log the error
       this.logger.error(
         `Failed to create order: ${error.message}`,
         error.stack,
@@ -134,6 +125,20 @@ export class OrdersService {
     }
   }
 
+  // async createOrder(createOrderDto: CreateOrderDto): Promise<Order> {
+  //   const order = this.orderRepository.create(createOrderDto);
+  //   return this.orderRepository.save(order);
+  // }
+
+  async updateInventory(orderId: number): Promise<void> {
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId },
+    });
+    if (!order) {
+      throw new Error('Order not found');
+    }
+    // Perform inventory update logic here
+  }
   async cancel(orderId: number): Promise<void> {
     try {
       const order = await this.findOne(orderId);
