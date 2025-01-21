@@ -127,6 +127,9 @@ import { TranslationsModule } from './translations/translations.module';
         database: configService.get('DB_NAME'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: true, // Set to false in production
+        ssl: {
+          rejectUnauthorized: false, // Required for some databases like Neon
+        },
       }),
     }),
     I18nModule.forRoot({

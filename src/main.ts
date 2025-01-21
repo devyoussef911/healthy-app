@@ -5,6 +5,10 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import { Handler, Context, Callback } from 'aws-lambda';
+import serverlessExpress from '@vendia/serverless-express';
+
+let server: Handler;
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -44,9 +48,19 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document); // Serve Swagger at /api
 
-  // Start the application
-  await app.listen(3000);
-  console.log(`Application is running on: http://localhost:3000`);
+  // Initialize the app
+  await app.init();
+
+  // Return the Express app instance for serverless-express
+  return serverlessExpress({ app: app.getHttpAdapter().getInstance() });
 }
 
-bootstrap();
+// Export the handler function for Vercel
+export const handler: Handler = async (
+  event: any,
+  context: Context,
+  callback: Callback,
+) => {
+  server = server ?? (await bootstrap());
+  return server(event, context, callback);
+};
