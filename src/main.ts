@@ -6,13 +6,18 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { Handler, Context, Callback } from 'aws-lambda';
-import serverlessExpress from '@vendia/serverless-express';
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { createServer, proxy } from 'aws-serverless-express';
+import * as express from 'express';
+import { ExpressAdapter } from '@nestjs/platform-express';
 
-let server: Handler;
+let cachedServer: any;
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+async function bootstrapServer() {
+  const expressApp = express();
+  const app = await NestFactory.create(
+    AppModule,
+    new ExpressAdapter(expressApp),
+  );
 
   // Security Middleware
   app.use(helmet()); // Add security headers
@@ -52,18 +57,14 @@ async function bootstrap() {
   // Initialize the app
   await app.init();
 
-  // Return the Express app instance for serverless-express
-  return serverlessExpress({ app: app.getHttpAdapter().getInstance() });
+  return createServer(expressApp);
 }
 
-// Export the handler function for Vercel
-export const handler: Handler = async (
-  event: APIGatewayProxyEvent,
-  context: Context,
-  callback: Callback,
-): Promise<APIGatewayProxyResult> => {
-  server = server ?? (await bootstrap());
-  return server(event, context, callback);
+export const handler: Handler = async (event: any, context: Context) => {
+  if (!cachedServer) {
+    cachedServer = await bootstrapServer();
+  }
+  return proxy(cachedServer, event, context, 'PROMISE').promise;
 };
 
 // Export the handler as the default export for Vercel
