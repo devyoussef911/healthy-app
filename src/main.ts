@@ -5,7 +5,6 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { createServer, proxy } from 'vercel-node-server';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -45,15 +44,9 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document); // Serve Swagger at /api
 
-  // Vercel Deployment
-  if (process.env.VERCEL) {
-    const server = await createServer(app.getHttpAdapter().getInstance());
-    proxy(server, app.getHttpAdapter().getInstance(), {});
-  } else {
-    // Local Development
-    await app.listen(3000);
-    console.log(`Application is running on: http://localhost:3000`);
-  }
+  // Start the application
+  await app.listen(3000);
+  console.log(`Application is running on: http://localhost:3000`);
 }
 
 bootstrap();
