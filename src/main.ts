@@ -57,7 +57,7 @@ async function bootstrapServer() {
   // Initialize the app
   await app.init();
 
-  return createServer(expressApp);
+  return createServer(expressApp, undefined, ['*/*']);
 }
 
 export const handler: Handler = async (event: any, context: Context) => {
