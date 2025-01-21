@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { Handler, Context, Callback } from 'aws-lambda';
 import serverlessExpress from '@vendia/serverless-express';
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
 let server: Handler;
 
@@ -57,10 +58,10 @@ async function bootstrap() {
 
 // Export the handler function for Vercel
 export const handler: Handler = async (
-  event: any,
+  event: APIGatewayProxyEvent,
   context: Context,
   callback: Callback,
-) => {
+): Promise<APIGatewayProxyResult> => {
   server = server ?? (await bootstrap());
   return server(event, context, callback);
 };
