@@ -64,3 +64,6 @@ export const handler: Handler = async (
   server = server ?? (await bootstrap());
   return server(event, context, callback);
 };
+
+// Export the handler as the default export for Vercel
+export default handler;
