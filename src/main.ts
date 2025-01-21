@@ -60,10 +60,30 @@ async function bootstrapServer() {
   return createServer(expressApp, undefined, ['*/*']);
 }
 
+function sanitizeEvent(event: any) {
+  const seen = new WeakSet();
+  return JSON.parse(
+    JSON.stringify(event, (key, value) => {
+      if (typeof value === 'object' && value !== null) {
+        if (seen.has(value)) {
+          return; // Remove circular reference
+        }
+        seen.add(value);
+      }
+      return value;
+    }),
+  );
+}
+
 export const handler: Handler = async (event: any, context: Context) => {
+  console.log('Event:', JSON.stringify(event, null, 2)); // Log the event
+  console.log('Context:', JSON.stringify(context, null, 2)); // Log the context
+
   if (!cachedServer) {
     cachedServer = await bootstrapServer();
   }
+  const sanitizedEvent = sanitizeEvent(event);
+  console.log('Sanitized Event:', JSON.stringify(sanitizedEvent, null, 2));
   return proxy(cachedServer, event, context, 'PROMISE').promise;
 };
 
