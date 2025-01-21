@@ -5,24 +5,19 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { Server } from 'http';
 import { createServer, proxy } from 'vercel-node-server';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Security Middleware
-
   app.use(helmet()); // Add security headers
-
   app.enableCors(); // Enable CORS (configure as needed)
 
   // Rate Limiting
-
   app.use(
     rateLimit({
       windowMs: 15 * 60 * 1000, // 15 minutes
-
       max: 100, // Limit each IP to 100 requests per windowMs
     }),
   );
@@ -36,16 +31,10 @@ async function bootstrap() {
     }),
   );
 
-  if (process.env.VERCEL) {
-    const server = await createServer();
-    proxy(server, app.getHttpAdapter().getInstance());
-  } else {
-    await app.listen(3000);
-  }
-
   // Global Guards
   const reflector = new Reflector();
   app.useGlobalGuards(new RolesGuard(reflector)); // Register RolesGuard globally
+
   // Swagger Documentation
   const config = new DocumentBuilder()
     .setTitle('Healthy Milk Products API')
@@ -55,7 +44,16 @@ async function bootstrap() {
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document); // Serve Swagger at /api
-  await app.listen(3000);
+
+  // Vercel Deployment
+  if (process.env.VERCEL) {
+    const server = await createServer(app.getHttpAdapter().getInstance());
+    proxy(server, app.getHttpAdapter().getInstance(), {});
+  } else {
+    // Local Development
+    await app.listen(3000);
+    console.log(`Application is running on: http://localhost:3000`);
+  }
 }
 
 bootstrap();
