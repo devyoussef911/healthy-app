@@ -7,7 +7,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { Handler, Context, Callback } from 'aws-lambda';
 import { createServer, proxy } from 'aws-serverless-express';
-import * as express from 'express';
+import express from 'express';
 import { ExpressAdapter } from '@nestjs/platform-express';
 
 let cachedServer: any;
