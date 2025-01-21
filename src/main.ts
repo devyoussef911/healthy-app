@@ -5,15 +5,14 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { Handler, Context, Callback } from 'aws-lambda';
-import { createServer, proxy } from 'aws-serverless-express';
 import express from 'express';
 import { ExpressAdapter } from '@nestjs/platform-express';
 
-let cachedServer: any;
+// Create an Express app
+const expressApp = express();
 
-async function bootstrapServer() {
-  const expressApp = express();
+// Bootstrap the NestJS app
+async function bootstrap() {
   const app = await NestFactory.create(
     AppModule,
     new ExpressAdapter(expressApp),
@@ -57,35 +56,22 @@ async function bootstrapServer() {
   // Initialize the app
   await app.init();
 
-  return createServer(expressApp, undefined, ['*/*']);
+  // Return the Express app
+  return expressApp;
 }
 
-function sanitizeEvent(event: any) {
-  const seen = new WeakSet();
-  return JSON.parse(
-    JSON.stringify(event, (key, value) => {
-      if (typeof value === 'object' && value !== null) {
-        if (seen.has(value)) {
-          return; // Remove circular reference
-        }
-        seen.add(value);
-      }
-      return value;
-    }),
-  );
-}
+// Bootstrap the app and export the handler for Vercel
+let cachedApp: express.Express;
 
-export const handler: Handler = async (event: any, context: Context) => {
-  console.log('Event:', JSON.stringify(event, null, 2)); // Log the event
-  console.log('Context:', JSON.stringify(context, null, 2)); // Log the context
+export default async function handler(
+  req: express.Request,
+  res: express.Response,
+) {
+  console.log('Request:', JSON.stringify(req.headers, null, 2)); // Log request headers
+  console.log('Response:', JSON.stringify(res.getHeaders(), null, 2)); // Log response headers
 
-  if (!cachedServer) {
-    cachedServer = await bootstrapServer();
+  if (!cachedApp) {
+    cachedApp = await bootstrap();
   }
-  const sanitizedEvent = sanitizeEvent(event);
-  console.log('Sanitized Event:', JSON.stringify(sanitizedEvent, null, 2));
-  return proxy(cachedServer, event, context, 'PROMISE').promise;
-};
-
-// Export the handler as the default export for Vercel
-export default handler;
+  return cachedApp(req, res);
+}
