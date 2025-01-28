@@ -9,7 +9,6 @@ import { Repository } from 'typeorm';
 import { Product } from './product.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { Category } from '../categories/category.entity';
-import { I18nService } from 'nestjs-i18n';
 import { TranslationsService } from '../translations/translations.service';
 
 @Injectable()
@@ -18,13 +17,17 @@ export class ProductsService {
 
   constructor(
     @InjectRepository(Product)
-    private productRepository: Repository<Product>,
+    private readonly productRepository: Repository<Product>,
     @InjectRepository(Category)
-    private categoryRepository: Repository<Category>,
-    private readonly i18n: I18nService,
+    private readonly categoryRepository: Repository<Category>,
     private readonly translationsService: TranslationsService,
   ) {}
 
+  /**
+   * Creates a new product
+   * @param createProductDto Product creation DTO
+   * @returns Newly created product
+   */
   async create(createProductDto: CreateProductDto): Promise<Product> {
     try {
       const {
@@ -38,17 +41,17 @@ export class ProductsService {
       } = createProductDto;
 
       this.logger.log(
-        `Creating product with DTO: ${JSON.stringify(createProductDto)}`,
+        `Creating product with data: ${JSON.stringify(createProductDto)}`,
       );
 
+      // Verify the category exists
       const category = await this.categoryRepository.findOne({
         where: { id: categoryId },
       });
       if (!category) {
+        this.logger.warn(`Category with ID ${categoryId} not found`);
         throw new NotFoundException('Category not found');
       }
-
-      this.logger.log(`Found category: ${JSON.stringify(category)}`);
 
       // Create the product entity
       const product = this.productRepository.create({
@@ -58,12 +61,11 @@ export class ProductsService {
         stock,
         imageUrl,
         category,
-        variations, // Add variations
+        variations,
       });
 
-      // Save the product
+      // Save the product to the database
       const savedProduct = await this.productRepository.save(product);
-
       this.logger.log(
         `Product created successfully: ${JSON.stringify(savedProduct)}`,
       );
@@ -78,15 +80,31 @@ export class ProductsService {
     }
   }
 
-  async findOne(id: number): Promise<Product> {
+  /**
+   * Finds a product by ID and applies translations
+   * @param id Product ID
+   * @param lang Language code
+   * @returns Translated product
+   */
+  async findOne(id: number, lang: string): Promise<Product> {
     try {
       const product = await this.productRepository.findOne({ where: { id } });
       if (!product) {
+        this.logger.warn(`Product with ID ${id} not found`);
         throw new NotFoundException('Product not found');
       }
 
-      this.logger.log(`Fetched product: ${JSON.stringify(product)}`);
+      // Apply translations
+      product.name = await this.translationsService.getTranslation(
+        product.name,
+        lang,
+      );
+      product.description = await this.translationsService.getTranslation(
+        product.description,
+        lang,
+      );
 
+      this.logger.log(`Fetched product: ${JSON.stringify(product)}`);
       return product;
     } catch (error) {
       this.logger.error(
@@ -97,14 +115,25 @@ export class ProductsService {
     }
   }
 
+  /**
+   * Searches and filters products with optional translations
+   * @param search Search keyword
+   * @param categoryId Filter by category ID
+   * @param minPrice Minimum price filter
+   * @param maxPrice Maximum price filter
+   * @param inStock Filter by stock availability
+   * @param lang Language code for translations
+   * @returns Filtered and translated products
+   */
   async searchAndFilter(
     search?: string,
     categoryId?: number | null,
     minPrice?: number | null,
     maxPrice?: number | null,
     inStock?: boolean,
+    lang?: string,
   ): Promise<Product[]> {
-    this.logger.log(`Search and filter parameters:`, {
+    this.logger.log('Applying search and filter criteria', {
       search,
       categoryId,
       minPrice,
@@ -114,63 +143,79 @@ export class ProductsService {
 
     const query = this.productRepository.createQueryBuilder('product');
 
-    if (search) {
+    // Apply search and filter criteria
+    if (search)
       query.andWhere('product.name LIKE :search', { search: `%${search}%` });
-    }
-
-    if (categoryId !== null && categoryId !== undefined) {
-      query.andWhere('product.categoryId = :categoryId', { categoryId });
-    }
-
-    if (
-      minPrice !== null &&
-      maxPrice !== null &&
-      minPrice !== undefined &&
-      maxPrice !== undefined
-    ) {
-      query.andWhere('product.price BETWEEN :minPrice AND :maxPrice', {
-        minPrice,
-        maxPrice,
-      });
-    } else if (minPrice !== null && minPrice !== undefined) {
+    if (categoryId)
+      query.andWhere('product.category.id = :categoryId', { categoryId });
+    if (minPrice !== undefined)
       query.andWhere('product.price >= :minPrice', { minPrice });
-    } else if (maxPrice !== null && maxPrice !== undefined) {
+    if (maxPrice !== undefined)
       query.andWhere('product.price <= :maxPrice', { maxPrice });
-    }
-
-    if (inStock !== undefined) {
-      query.andWhere('product.stock > 0');
-    }
+    if (inStock) query.andWhere('product.stock > 0');
 
     try {
       const products = await query.getMany();
-      this.logger.log(`Found products:`, products);
+
+      // Apply translations if a language is specified
+      if (lang) {
+        for (const product of products) {
+          product.name = await this.translationsService.getTranslation(
+            product.name,
+            lang,
+          );
+          product.description = await this.translationsService.getTranslation(
+            product.description,
+            lang,
+          );
+        }
+      }
+
+      this.logger.log(`Found ${products.length} products`);
       return products;
     } catch (error) {
-      this.logger.error(`Failed to fetch products:`, error.stack);
-      throw new InternalServerErrorException('Failed to fetch product');
+      this.logger.error(
+        `Failed to fetch products: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Failed to fetch products');
     }
   }
 
+  /**
+   * Fetch product details and apply translations
+   * @param productId Product ID
+   * @param lang Language code
+   * @returns Translated product details
+   */
   async getProductDetails(productId: number, lang: string): Promise<Product> {
-    const product = await this.productRepository.findOne({
-      where: { id: productId },
-    });
+    try {
+      const product = await this.productRepository.findOne({
+        where: { id: productId },
+      });
+      if (!product) {
+        this.logger.warn(`Product with ID ${productId} not found`);
+        throw new NotFoundException('Product not found');
+      }
 
-    if (!product) {
-      throw new NotFoundException('Product not found');
+      // Apply translations
+      product.name = await this.translationsService.getTranslation(
+        product.name,
+        lang,
+      );
+      product.description = await this.translationsService.getTranslation(
+        product.description,
+        lang,
+      );
+
+      this.logger.log(`Fetched product details for ID: ${productId}`);
+      return product;
+    } catch (error) {
+      this.logger.error(
+        `Failed to fetch product details: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Failed to fetch product details');
     }
-
-    // Apply translations to the product name and description
-    product.name = await this.translationsService.getTranslation(
-      'product.name',
-      lang,
-    );
-    product.description = await this.translationsService.getTranslation(
-      'product.description',
-      lang,
-    );
-
-    return product;
   }
 }

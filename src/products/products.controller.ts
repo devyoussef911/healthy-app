@@ -13,32 +13,38 @@ import {
   ParseIntPipe,
   DefaultValuePipe,
   Req,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
-import { Product } from './product.entity';
 import { SearchProductsDto } from './dto/search-products.dto';
-import { I18nService } from 'nestjs-i18n';
-import { IRequestWithLang } from '../types/request.types'; // Import the custom interface
+import { Product } from './product.entity';
+import { IRequestWithLang } from '../types/request.types';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { UserRole } from '../users/enums/user-role.enum';
 
 @ApiTags('products')
 @Controller(':lang/products')
 export class ProductsController {
-  constructor(
-    private readonly productsService: ProductsService,
-    private readonly i18n: I18nService,
-  ) {}
+  constructor(private readonly productsService: ProductsService) {}
 
+  // Create Product
   @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN) // Ensure only admins can create products
   @UsePipes(new ValidationPipe({ transform: true }))
+  @ApiBearerAuth()
   @ApiResponse({
     status: 201,
     description: 'Product created successfully',
     type: Product,
   })
-  @ApiResponse({ status: 400, description: 'Failed to create product' })
-  async create(@Body() createProductDto: CreateProductDto) {
+  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  async create(@Body() createProductDto: CreateProductDto): Promise<Product> {
     try {
       return await this.productsService.create(createProductDto);
     } catch (error) {
@@ -53,19 +59,72 @@ export class ProductsController {
     }
   }
 
+  // Fetch a Single Product
   @Get(':id')
-  @ApiResponse({ status: 200, description: 'Product found', type: Product })
+  @ApiResponse({
+    status: 200,
+    description: 'Product retrieved successfully',
+    type: Product,
+  })
   @ApiResponse({ status: 404, description: 'Product not found' })
   async findOne(
-    @Param('id') id: number,
+    @Param('id', ParseIntPipe) id: number,
     @Req() req: IRequestWithLang,
   ): Promise<Product> {
-    const lang = req.i18nLang || 'en'; // Get the language from the request object
-    return this.productsService.getProductDetails(id, lang);
+    try {
+      const lang = req.i18nLang || 'en';
+      return await this.productsService.getProductDetails(id, lang);
+    } catch (error) {
+      throw new HttpException(
+        {
+          status: HttpStatus.NOT_FOUND,
+          error: 'Product not found',
+        },
+        HttpStatus.NOT_FOUND,
+      );
+    }
   }
 
+  // Search and Filter Products
   @Get('search')
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search term',
+  })
+  @ApiQuery({
+    name: 'categoryId',
+    required: false,
+    type: Number,
+    description: 'Category ID',
+  })
+  @ApiQuery({
+    name: 'minPrice',
+    required: false,
+    type: Number,
+    description: 'Minimum price',
+  })
+  @ApiQuery({
+    name: 'maxPrice',
+    required: false,
+    type: Number,
+    description: 'Maximum price',
+  })
+  @ApiQuery({
+    name: 'inStock',
+    required: false,
+    type: Boolean,
+    description: 'In-stock status',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Products retrieved successfully',
+    type: [Product],
+  })
+  @ApiResponse({ status: 404, description: 'No products found' })
   async searchAndFilter(
+    @Req() req: IRequestWithLang, // Move this parameter first
     @Query('search') search?: string,
     @Query('categoryId', new DefaultValuePipe(null), ParseIntPipe)
     categoryId?: number,
@@ -73,14 +132,16 @@ export class ProductsController {
     minPrice?: number,
     @Query('maxPrice', new DefaultValuePipe(null), ParseIntPipe)
     maxPrice?: number,
-    @Query('inStock') inStock?: boolean,
+    @Query('inStock', new DefaultValuePipe(true)) inStock?: boolean,
   ): Promise<Product[]> {
+    const lang = req.i18nLang || 'en';
     const products = await this.productsService.searchAndFilter(
       search,
       categoryId,
       minPrice,
       maxPrice,
       inStock,
+      lang,
     );
 
     if (!products.length) {

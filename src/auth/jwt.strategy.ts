@@ -24,6 +24,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user) {
       throw new ForbiddenException('User not found');
     }
-    return user; // Attach user to request
+    return { id: user.id, email: user.email, role: user.role }; // Return only necessary fields
   }
 }
