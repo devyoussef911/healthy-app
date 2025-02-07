@@ -171,44 +171,45 @@
 //   }
 // }
 
+import { CacheModule } from '@nestjs/cache-manager';
 import {
-  Module,
   MiddlewareConsumer,
+  Module,
   NestModule,
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
-  I18nModule,
-  HeaderResolver,
-  QueryResolver,
   AcceptLanguageResolver,
+  HeaderResolver,
+  I18nModule,
+  QueryResolver,
 } from 'nestjs-i18n';
 import * as path from 'path';
-import { CacheModule } from '@nestjs/cache-manager';
-import { LanguageMiddleware } from './middleware/language.middleware';
-import { LoggerMiddleware } from './middleware/logger.middleware';
-import { UsersModule } from './users/users.module';
-import { AuthModule } from './auth/auth.module';
-import { ProductsModule } from './products/products.module';
-import { CategoriesModule } from './categories/categories.module';
-import { OrdersModule } from './orders/orders.module';
-import { NotificationsModule } from './notifications/notifications.module';
-import { PricingModule } from './pricing/pricing.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { AuditLogModule } from './audit-log/audit-log.module';
+import { AuthModule } from './auth/auth.module';
+import { CategoriesModule } from './categories/categories.module';
+import { RolesGuard } from './common/guards/roles.guard';
 import { FeedbackModule } from './feedback/feedback.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { LanguageMiddleware } from './middleware/language.middleware';
+import { LoggerMiddleware } from './middleware/logger.middleware';
+import { NotificationsModule } from './notifications/notifications.module';
+import { OrdersModule } from './orders/orders.module';
+import { PricingModule } from './pricing/pricing.module';
+import { ProductsModule } from './products/products.module';
 import { TranslationsModule } from './translations/translations.module';
-import { AuditLogModule } from './audit-log/audit-log.module';
-import { APP_GUARD } from '@nestjs/core';
-import { RolesGuard } from './common/guards/roles.guard';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: `.env.${process.env.NODE_ENV || 'development'}.local`,
+      // envFilePath: `.env.${process.env.NODE_ENV || 'development'}.local`,
+      envFilePath: `.env.development.local`,
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -221,10 +222,8 @@ import { RolesGuard } from './common/guards/roles.guard';
         password: configService.get('DB_PASSWORD'),
         database: configService.get('DB_NAME'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: process.env.NODE_ENV !== 'production',
-        ssl: {
-          rejectUnauthorized: false,
-        },
+        synchronize: process.env.NODE_ENV !== 'production', // Disable synchronize in production
+        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false, // Enable SSL only in production
       }),
     }),
     CacheModule.register({
