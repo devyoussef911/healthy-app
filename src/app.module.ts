@@ -209,7 +209,7 @@ import { UsersModule } from './users/users.module';
     ConfigModule.forRoot({
       isGlobal: true,
       // envFilePath: `.env.${process.env.NODE_ENV || 'development'}.local`,
-      envFilePath: `.env.development.local`,
+      envFilePath: `/etc/secrets/.env.development.local`,
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
