@@ -203,6 +203,7 @@ import { TranslationsModule } from './translations/translations.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
 import { APP_GUARD } from '@nestjs/core';
 import { RolesGuard } from './common/guards/roles.guard';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 
 @Module({
   imports: [
@@ -256,6 +257,10 @@ import { RolesGuard } from './common/guards/roles.guard';
     AuditLogModule,
   ],
   providers: [
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard, // Register JWT guard first
+    },
     {
       provide: APP_GUARD,
       useClass: RolesGuard,

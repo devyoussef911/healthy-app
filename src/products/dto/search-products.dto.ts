@@ -1,3 +1,4 @@
+// src/products/dto/search-products.dto.ts
 import {
   IsOptional,
   IsNumber,
@@ -14,23 +15,42 @@ export class SearchProductsDto {
 
   @IsOptional()
   @IsNumber()
-  @Type(() => Number) // Ensure the value is transformed to a number
+  @Type(() => Number)
   categoryId?: number;
 
   @IsOptional()
   @IsNumber()
-  @Min(0) // Ensure the value is a positive number
-  @Type(() => Number) // Ensure the value is transformed to a number
+  @Min(0)
+  @Type(() => Number)
   minPrice?: number;
 
   @IsOptional()
   @IsNumber()
-  @Min(0) // Ensure the value is a positive number
-  @Type(() => Number) // Ensure the value is transformed to a number
+  @Min(0)
+  @Type(() => Number)
   maxPrice?: number;
 
   @IsOptional()
   @IsBoolean()
-  @Type(() => Boolean) // Ensure the value is transformed to a boolean
+  @Type(() => Boolean)
   inStock?: boolean;
+
+  // You can also include pagination and sorting:
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  page?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  limit?: number;
+
+  @IsOptional()
+  @IsString()
+  sortBy?: string;
+
+  @IsOptional()
+  @IsString()
+  sortOrder?: 'asc' | 'desc';
 }

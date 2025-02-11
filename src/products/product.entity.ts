@@ -1,3 +1,4 @@
+// src/products/product.entity.ts
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -7,6 +8,7 @@ import {
 } from 'typeorm';
 import { Category } from '../categories/category.entity';
 import { PricingRule } from '../pricing/pricing-rule.entity';
+import { Order } from 'src/orders/order.entity';
 import {
   IsNotEmpty,
   IsNumber,
@@ -16,7 +18,6 @@ import {
   IsBoolean,
   IsArray,
 } from 'class-validator';
-import { Order } from 'src/orders/order.entity';
 
 @Entity()
 export class Product {
@@ -64,6 +65,7 @@ export class Product {
 
   @OneToMany(() => PricingRule, (pricingRule) => pricingRule.product)
   pricingRules: PricingRule[];
+
   @OneToMany(() => Order, (order) => order.products)
   orders: Order[];
 

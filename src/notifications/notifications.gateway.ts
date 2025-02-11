@@ -30,7 +30,7 @@ export class NotificationsGateway {
 
   handleDisconnect(@ConnectedSocket() client: Socket) {
     const userId = Array.from(this.userSockets.entries()).find(
-      ([_, socket]) => socket.id === client.id,
+      ([, socket]) => socket.id === client.id,
     )?.[0];
     if (userId) {
       this.userSockets.delete(userId);
@@ -43,7 +43,7 @@ export class NotificationsGateway {
     if (socket) {
       socket.emit('notification', { message, type });
       this.logger.log(`Notification sent to user ${userId}: ${message}`);
-
+      // Optionally record the notification in the database.
       const user = { id: userId } as User;
       await this.notificationsService.createNotification(user, message, type);
     } else {
@@ -54,8 +54,7 @@ export class NotificationsGateway {
   async notifyAdmins(message: string, type: string) {
     this.server.emit('adminNotification', { message, type });
     this.logger.log(`Admin notification sent: ${message}`);
-
-    // Fetch all admin users and store notifications for each
+    // Fetch all admin users and store notifications for each.
     const admins = await this.notificationsService.getAdmins();
     for (const admin of admins) {
       await this.notificationsService.createNotification(admin, message, type);

@@ -1,3 +1,4 @@
+// src/products/products.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProductsController } from './products.controller';
@@ -5,15 +6,18 @@ import { ProductsService } from './products.service';
 import { Product } from './product.entity';
 import { Category } from '../categories/category.entity';
 import { PricingModule } from '../pricing/pricing.module';
-import { TranslationsModule } from '../translations/translations.module'; // Import TranslationsModule
+import { TranslationsModule } from '../translations/translations.module';
+import { CacheModule } from '@nestjs/cache-manager';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Product, Category]), // Ensure entities are imported
-    PricingModule, // Import PricingModule
-    TranslationsModule, // Import TranslationsModule
+    TypeOrmModule.forFeature([Product, Category]),
+    PricingModule,
+    TranslationsModule,
+    CacheModule.register(), // Registers the Nest cache provider.
   ],
-  controllers: [ProductsController], // Ensure the controller is registered
-  providers: [ProductsService], // Ensure the service is registered
+  controllers: [ProductsController],
+  providers: [ProductsService],
+  exports: [ProductsService],
 })
 export class ProductsModule {}

@@ -1,3 +1,4 @@
+// src/products/dto/create-product.dto.ts
 import {
   IsNotEmpty,
   IsNumber,
@@ -39,5 +40,5 @@ export class CreateProductDto {
     size: string;
     price: number;
     stock: number;
-  }>; // Add this field
+  }>;
 }

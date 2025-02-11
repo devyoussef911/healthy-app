@@ -3,11 +3,15 @@ import {
   NotFoundException,
   InternalServerErrorException,
   Logger,
+  Inject,
 } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Cache } from 'cache-manager';
 import { Product } from './product.entity';
 import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
 import { Category } from '../categories/category.entity';
 import { TranslationsService } from '../translations/translations.service';
 
@@ -21,13 +25,9 @@ export class ProductsService {
     @InjectRepository(Category)
     private readonly categoryRepository: Repository<Category>,
     private readonly translationsService: TranslationsService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
-  /**
-   * Creates a new product
-   * @param createProductDto Product creation DTO
-   * @returns Newly created product
-   */
   async create(createProductDto: CreateProductDto): Promise<Product> {
     try {
       const {
@@ -44,7 +44,6 @@ export class ProductsService {
         `Creating product with data: ${JSON.stringify(createProductDto)}`,
       );
 
-      // Verify the category exists
       const category = await this.categoryRepository.findOne({
         where: { id: categoryId },
       });
@@ -53,7 +52,6 @@ export class ProductsService {
         throw new NotFoundException('Category not found');
       }
 
-      // Create the product entity
       const product = this.productRepository.create({
         name,
         description,
@@ -64,12 +62,10 @@ export class ProductsService {
         variations,
       });
 
-      // Save the product to the database
       const savedProduct = await this.productRepository.save(product);
       this.logger.log(
         `Product created successfully: ${JSON.stringify(savedProduct)}`,
       );
-
       return savedProduct;
     } catch (error) {
       this.logger.error(
@@ -80,12 +76,6 @@ export class ProductsService {
     }
   }
 
-  /**
-   * Finds a product by ID and applies translations
-   * @param id Product ID
-   * @param lang Language code
-   * @returns Translated product
-   */
   async findOne(id: number, lang: string): Promise<Product> {
     try {
       const product = await this.productRepository.findOne({ where: { id } });
@@ -94,7 +84,6 @@ export class ProductsService {
         throw new NotFoundException('Product not found');
       }
 
-      // Apply translations
       product.name = await this.translationsService.getTranslation(
         product.name,
         lang,
@@ -115,16 +104,6 @@ export class ProductsService {
     }
   }
 
-  /**
-   * Searches and filters products with optional translations
-   * @param search Search keyword
-   * @param categoryId Filter by category ID
-   * @param minPrice Minimum price filter
-   * @param maxPrice Maximum price filter
-   * @param inStock Filter by stock availability
-   * @param lang Language code for translations
-   * @returns Filtered and translated products
-   */
   async searchAndFilter(
     search?: string,
     categoryId?: number | null,
@@ -132,6 +111,10 @@ export class ProductsService {
     maxPrice?: number | null,
     inStock?: boolean,
     lang?: string,
+    page: number = 1,
+    limit: number = 10,
+    sortBy: string = 'name',
+    sortOrder: 'asc' | 'desc' = 'asc',
   ): Promise<Product[]> {
     this.logger.log('Applying search and filter criteria', {
       search,
@@ -139,25 +122,48 @@ export class ProductsService {
       minPrice,
       maxPrice,
       inStock,
+      page,
+      limit,
+      sortBy,
+      sortOrder,
     });
+
+    const cacheKey = `products:${search || ''}:${categoryId || 'all'}:${minPrice || 0}:${
+      maxPrice || 0
+    }:${inStock}:${page}:${limit}:${sortBy}:${sortOrder}`;
+    const cached = await this.cacheManager.get<Product[]>(cacheKey);
+    if (cached) {
+      this.logger.log(`Returning cached products for key: ${cacheKey}`);
+      return cached;
+    }
 
     const query = this.productRepository.createQueryBuilder('product');
 
-    // Apply search and filter criteria
-    if (search)
-      query.andWhere('product.name LIKE :search', { search: `%${search}%` });
-    if (categoryId)
-      query.andWhere('product.category.id = :categoryId', { categoryId });
-    if (minPrice !== undefined)
+    if (search) {
+      query.andWhere('product.name ILIKE :search', { search: `%${search}%` });
+    }
+    if (categoryId) {
+      query.andWhere('product.categoryId = :categoryId', { categoryId });
+    }
+    if (minPrice !== undefined && minPrice !== null) {
       query.andWhere('product.price >= :minPrice', { minPrice });
-    if (maxPrice !== undefined)
+    }
+    if (maxPrice !== undefined && maxPrice !== null) {
       query.andWhere('product.price <= :maxPrice', { maxPrice });
-    if (inStock) query.andWhere('product.stock > 0');
+    }
+    if (inStock) {
+      query.andWhere('product.stock > 0');
+    }
+
+    query.orderBy(
+      `product.${sortBy}`,
+      sortOrder.toUpperCase() as 'ASC' | 'DESC',
+    );
+    query.skip((page - 1) * limit).take(limit);
 
     try {
       const products = await query.getMany();
 
-      // Apply translations if a language is specified
       if (lang) {
         for (const product of products) {
           product.name = await this.translationsService.getTranslation(
@@ -171,7 +177,8 @@ export class ProductsService {
         }
       }
 
-      this.logger.log(`Found ${products.length} products`);
+      // Set cache with TTL as a number (300 seconds)
+      await this.cacheManager.set(cacheKey, products, 300);
       return products;
     } catch (error) {
       this.logger.error(
@@ -182,12 +189,64 @@ export class ProductsService {
     }
   }
 
-  /**
-   * Fetch product details and apply translations
-   * @param productId Product ID
-   * @param lang Language code
-   * @returns Translated product details
-   */
+  async updateProduct(
+    id: number,
+    updateDto: UpdateProductDto,
+  ): Promise<Product> {
+    const product = await this.productRepository.findOne({ where: { id } });
+    if (!product) {
+      this.logger.warn(`Product with ID ${id} not found for update`);
+      throw new NotFoundException('Product not found');
+    }
+
+    if (updateDto.categoryId) {
+      const category = await this.categoryRepository.findOne({
+        where: { id: updateDto.categoryId },
+      });
+      if (!category) {
+        this.logger.warn(
+          `Category with ID ${updateDto.categoryId} not found during product update`,
+        );
+        throw new NotFoundException('Category not found');
+      }
+      updateDto['category'] = category;
+    }
+
+    Object.assign(product, updateDto);
+    const savedProduct = await this.productRepository.save(product);
+    this.logger.log(`Product with ID ${id} updated successfully`);
+    return savedProduct;
+  }
+
+  async deleteProduct(id: number): Promise<{ message: string }> {
+    const product = await this.productRepository.findOne({ where: { id } });
+    if (!product) {
+      this.logger.warn(`Product with ID ${id} not found for deletion`);
+      throw new NotFoundException('Product not found');
+    }
+
+    await this.productRepository.remove(product);
+    this.logger.log(`Product with ID ${id} deleted successfully`);
+    return { message: 'Product deleted successfully' };
+  }
+
+  async translateProduct(product: Product, lang: string): Promise<Product> {
+    try {
+      product.name = await this.translationsService.getTranslation(
+        product.name,
+        lang,
+      );
+      product.description = await this.translationsService.getTranslation(
+        product.description,
+        lang,
+      );
+      return product;
+    } catch (error) {
+      this.logger.error(`Translation failed: ${error.message}`);
+      return product;
+    }
+  }
+
   async getProductDetails(productId: number, lang: string): Promise<Product> {
     try {
       const product = await this.productRepository.findOne({
@@ -198,7 +257,6 @@ export class ProductsService {
         throw new NotFoundException('Product not found');
       }
 
-      // Apply translations
       product.name = await this.translationsService.getTranslation(
         product.name,
         lang,
