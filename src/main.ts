@@ -12,14 +12,12 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import * as swaggerUiDist from 'swagger-ui-dist';
 
-// Create an Express app for handling API requests
+// Create an Express app
 const expressApp = express();
 let isAppInitialized = false;
 
 async function bootstrap() {
-  if (isAppInitialized) {
-    return;
-  }
+  if (isAppInitialized) return;
   console.log('Bootstrapping the app...');
 
   const app = await NestFactory.create(
@@ -61,25 +59,36 @@ async function bootstrap() {
     .build();
   const document = SwaggerModule.createDocument(app, config);
 
-  // 🚀 Fix: Serve Swagger UI static files (CSS, JS, fonts) properly
+  // 🚀 Fix: Serve Swagger UI static files with correct MIME types
   const SWAGGER_ASSET_PATH = swaggerUiDist.absolutePath();
-  app.use('/api/swagger-ui', express.static(SWAGGER_ASSET_PATH));
+  app.use(
+    '/swagger-ui',
+    express.static(SWAGGER_ASSET_PATH, {
+      setHeaders: (res, path) => {
+        if (path.endsWith('.css')) {
+          res.setHeader('Content-Type', 'text/css');
+        } else if (path.endsWith('.js')) {
+          res.setHeader('Content-Type', 'application/javascript');
+        }
+      },
+    }),
+  );
 
-  // 🚀 Fix: Ensure Swagger loads assets correctly on both local & Vercel
+  // 🚀 Fix: Correctly configure Swagger UI paths
   SwaggerModule.setup('api', app, document, {
-    customCssUrl: '/api/swagger-ui/swagger-ui.css',
+    customCssUrl: '/swagger-ui/swagger-ui.css',
     customJs: [
-      '/api/swagger-ui/swagger-ui-bundle.js',
-      '/api/swagger-ui/swagger-ui-standalone-preset.js',
+      '/swagger-ui/swagger-ui-bundle.js',
+      '/swagger-ui/swagger-ui-standalone-preset.js',
     ],
   });
 
-  // ✅ Save Swagger JSON to `/tmp`, which is writable in Vercel
+  // ✅ Save Swagger JSON to `/tmp` for Vercel compatibility
   const swaggerPath = join(tmpdir(), 'swagger-spec.json');
   fs.writeFileSync(swaggerPath, JSON.stringify(document, null, 2));
   console.log(`Swagger spec saved to: ${swaggerPath}`);
 
-  // Start listening on the correct port
+  // Set up server
   const port = process.env.PORT || 3000;
   await app.listen(port);
   console.log(`✅ NestJS API is live at: http://localhost:${port}/api`);
@@ -87,12 +96,12 @@ async function bootstrap() {
   isAppInitialized = true;
 }
 
-// ✅ Call bootstrap() immediately for local development
+// ✅ Bootstrap for local development
 if (process.env.NODE_ENV !== 'production') {
   bootstrap().catch((err) => console.error('Error bootstrapping app:', err));
 }
 
-// ✅ Fix: Export as a serverless function for Vercel
+// ✅ Fix: Export handler for Vercel
 export default async function handler(req, res) {
   if (!isAppInitialized) {
     await bootstrap();
