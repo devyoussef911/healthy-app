@@ -55,21 +55,15 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-<<<<<<< HEAD
   // Write the OpenAPI JSON file to disk so you can share it with your team.
   const outputPath = './swagger-spec.json';
   fs.writeFileSync(outputPath, JSON.stringify(document, null, 2));
   console.log(`Swagger spec saved to ${outputPath}`);
 
-  // Initialize the app and start listening
-  await app.listen(3000); // Ensure this line is there
-  console.log('NestJS app is listening on http://localhost:3000'); // Log when the app starts
-=======
-  // Use the PORT environment variable provided by Render
-  const port = process.env.PORT || 3000; // Default to 3000 for local development
+  // Use the PORT environment variable for deployment, default to 3000 for local dev
+  const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`NestJS app is listening on http://localhost:${port}`); // Log when the app starts
->>>>>>> 812129255d1b21e5fa1e9770c1f1d3ac9182f0e4
+  console.log(`NestJS app is listening on http://localhost:${port}`);
 
   // Initialize the app
   await app.init();
