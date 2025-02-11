@@ -10,6 +10,7 @@ import { ExpressAdapter } from '@nestjs/platform-express';
 import * as fs from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import * as swaggerUiDist from 'swagger-ui-dist';
 
 // Create an Express app for handling API requests
 const expressApp = express();
@@ -30,7 +31,7 @@ async function bootstrap() {
   app.use(helmet());
   app.enableCors();
 
-  // Rate Limiting (Protect against brute force attacks)
+  // Rate Limiting
   app.use(
     rateLimit({
       windowMs: 15 * 60 * 1000, // 15 minutes
@@ -38,7 +39,7 @@ async function bootstrap() {
     }),
   );
 
-  // Global Validation (Ensure proper request format)
+  // Global Validation
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -47,7 +48,7 @@ async function bootstrap() {
     }),
   );
 
-  // Global Guards (for role-based access)
+  // Global Guards
   const reflector = new Reflector();
   app.useGlobalGuards(new RolesGuard(reflector));
 
@@ -60,21 +61,25 @@ async function bootstrap() {
     .build();
   const document = SwaggerModule.createDocument(app, config);
 
-  // 🚀 Fix: Ensure Swagger works on both Vercel and local development
+  // 🚀 Fix: Serve Swagger UI static files (CSS, JS, fonts) properly
+  const SWAGGER_ASSET_PATH = swaggerUiDist.absolutePath();
+  app.use('/api/swagger-ui', express.static(SWAGGER_ASSET_PATH));
+
+  // 🚀 Fix: Ensure Swagger loads assets correctly on both local & Vercel
   SwaggerModule.setup('api', app, document, {
-    swaggerOptions: {
-      url: process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}/api-json`
-        : 'http://localhost:3000/api-json',
-    },
+    customCssUrl: '/api/swagger-ui/swagger-ui.css',
+    customJs: [
+      '/api/swagger-ui/swagger-ui-bundle.js',
+      '/api/swagger-ui/swagger-ui-standalone-preset.js',
+    ],
   });
 
-  // ✅ Fix: Save Swagger JSON to `/tmp`, which is writable in Vercel
+  // ✅ Save Swagger JSON to `/tmp`, which is writable in Vercel
   const swaggerPath = join(tmpdir(), 'swagger-spec.json');
   fs.writeFileSync(swaggerPath, JSON.stringify(document, null, 2));
   console.log(`Swagger spec saved to: ${swaggerPath}`);
 
-  // Set up the server port (default: 3000 for local development)
+  // Start listening on the correct port
   const port = process.env.PORT || 3000;
   await app.listen(port);
   console.log(`✅ NestJS API is live at: http://localhost:${port}/api`);
@@ -82,7 +87,7 @@ async function bootstrap() {
   isAppInitialized = true;
 }
 
-// ✅ Fix: Call `bootstrap()` immediately for local development
+// ✅ Call bootstrap() immediately for local development
 if (process.env.NODE_ENV !== 'production') {
   bootstrap().catch((err) => console.error('Error bootstrapping app:', err));
 }
