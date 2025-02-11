@@ -8,13 +8,15 @@ import rateLimit from 'express-rate-limit';
 import express from 'express';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import * as fs from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
 // Create an Express app
 const expressApp = express();
 
-// Bootstrap the NestJS app
 async function bootstrap() {
-  console.log('Bootstrapping the app...'); // Add this log
+  console.log('Bootstrapping the app...');
+
   const app = await NestFactory.create(
     AppModule,
     new ExpressAdapter(expressApp),
@@ -55,10 +57,10 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-  // Write the OpenAPI JSON file to disk so you can share it with your team.
-  const outputPath = './swagger-spec.json';
-  fs.writeFileSync(outputPath, JSON.stringify(document, null, 2));
-  console.log(`Swagger spec saved to ${outputPath}`);
+  // ✅ Fix: Save Swagger JSON to `/tmp`, which is writable in Vercel
+  const swaggerPath = join(tmpdir(), 'swagger-spec.json');
+  fs.writeFileSync(swaggerPath, JSON.stringify(document, null, 2));
+  console.log(`Swagger spec saved to: ${swaggerPath}`);
 
   // Use the PORT environment variable for deployment, default to 3000 for local dev
   const port = process.env.PORT || 3000;
@@ -67,12 +69,12 @@ async function bootstrap() {
 
   // Initialize the app
   await app.init();
-
-  // Return the Express app
-  return expressApp;
 }
 
-// Call the bootstrap function directly for local dev
-bootstrap().catch((err) => {
-  console.error('Error bootstrapping app:', err);
-});
+// ✅ Fix: Ensure Vercel recognizes this as a serverless function
+export default async function handler(req, res) {
+  if (!expressApp) {
+    await bootstrap();
+  }
+  expressApp(req, res);
+}
