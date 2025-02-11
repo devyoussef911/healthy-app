@@ -2,7 +2,6 @@ import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { RolesGuard } from './common/guards/roles.guard';
 import { ValidationPipe } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import express from 'express';
@@ -10,7 +9,6 @@ import { ExpressAdapter } from '@nestjs/platform-express';
 import * as fs from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import * as swaggerUiDist from 'swagger-ui-dist';
 
 // Create an Express app
 const expressApp = express();
@@ -50,45 +48,39 @@ async function bootstrap() {
   const reflector = new Reflector();
   app.useGlobalGuards(new RolesGuard(reflector));
 
-  // Swagger Documentation Setup
-  const config = new DocumentBuilder()
-    .setTitle('Healthy Milk Products API')
-    .setDescription('API for managing milk product orders')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
+  // Swagger Documentation JSON
+  const swaggerDocument = {
+    openapi: '3.0.1',
+    info: {
+      title: 'Healthy Milk Products API',
+      description: 'API for managing milk product orders',
+      version: '1.0',
+    },
+    paths: {},
+  };
 
-  // 🚀 Fix: Serve Swagger UI static files with correct MIME types
-  const SWAGGER_ASSET_PATH = swaggerUiDist.absolutePath();
-  app.use(
-    '/swagger-ui',
-    express.static(SWAGGER_ASSET_PATH, {
-      setHeaders: (res, path) => {
-        if (path.endsWith('.css')) {
-          res.setHeader('Content-Type', 'text/css');
-        } else if (path.endsWith('.js')) {
-          res.setHeader('Content-Type', 'application/javascript');
-        }
-      },
-    }),
-  );
+  // Save Swagger JSON in `/tmp`
+  const swaggerJsonPath = join(tmpdir(), 'swagger.json');
+  fs.writeFileSync(swaggerJsonPath, JSON.stringify(swaggerDocument, null, 2));
 
-  // 🚀 Fix: Correctly configure Swagger UI paths
-  SwaggerModule.setup('api', app, document, {
-    customCssUrl: '/swagger-ui/swagger-ui.css',
-    customJs: [
-      '/swagger-ui/swagger-ui-bundle.js',
-      '/swagger-ui/swagger-ui-standalone-preset.js',
-    ],
+  // ✅ Fix: Use `expressApp.get()` instead of `app.get()`
+  expressApp.get('/swagger.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(swaggerDocument);
   });
 
-  // ✅ Save Swagger JSON to `/tmp` for Vercel compatibility
-  const swaggerPath = join(tmpdir(), 'swagger-spec.json');
-  fs.writeFileSync(swaggerPath, JSON.stringify(document, null, 2));
-  console.log(`Swagger spec saved to: ${swaggerPath}`);
+  // ✅ Fix: Use `expressApp.get()` to redirect `/api` to Swagger UI
+  expressApp.get('/api', (req, res) => {
+    res.redirect('/swagger/index.html');
+  });
 
-  // Set up server
+  // ✅ Serve Swagger UI as Static Files
+  expressApp.use(
+    '/swagger',
+    express.static(join(__dirname, '..', 'public', 'swagger')),
+  );
+
+  // Start listening on the correct port
   const port = process.env.PORT || 3000;
   await app.listen(port);
   console.log(`✅ NestJS API is live at: http://localhost:${port}/api`);
