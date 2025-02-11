@@ -13,8 +13,12 @@ import { tmpdir } from 'os';
 
 // Create an Express app
 const expressApp = express();
+let isAppInitialized = false;
 
 async function bootstrap() {
+  if (isAppInitialized) {
+    return;
+  }
   console.log('Bootstrapping the app...');
 
   const app = await NestFactory.create(
@@ -57,7 +61,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-  // ✅ Fix: Save Swagger JSON to `/tmp`, which is writable in Vercel
+  // ✅ Save Swagger JSON to `/tmp`, which is writable in Vercel
   const swaggerPath = join(tmpdir(), 'swagger-spec.json');
   fs.writeFileSync(swaggerPath, JSON.stringify(document, null, 2));
   console.log(`Swagger spec saved to: ${swaggerPath}`);
@@ -67,13 +71,17 @@ async function bootstrap() {
   await app.listen(port);
   console.log(`NestJS app is listening on http://localhost:${port}`);
 
-  // Initialize the app
-  await app.init();
+  isAppInitialized = true;
 }
 
-// ✅ Fix: Ensure Vercel recognizes this as a serverless function
+// ✅ Call bootstrap() immediately in dev mode
+if (process.env.NODE_ENV !== 'production') {
+  bootstrap().catch((err) => console.error('Error bootstrapping app:', err));
+}
+
+// ✅ Ensure Vercel recognizes this as a serverless function
 export default async function handler(req, res) {
-  if (!expressApp) {
+  if (!isAppInitialized) {
     await bootstrap();
   }
   expressApp(req, res);
