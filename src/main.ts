@@ -11,7 +11,7 @@ import * as fs from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-// Create an Express app
+// Create an Express app for handling API requests
 const expressApp = express();
 let isAppInitialized = false;
 
@@ -30,7 +30,7 @@ async function bootstrap() {
   app.use(helmet());
   app.enableCors();
 
-  // Rate Limiting
+  // Rate Limiting (Protect against brute force attacks)
   app.use(
     rateLimit({
       windowMs: 15 * 60 * 1000, // 15 minutes
@@ -38,7 +38,7 @@ async function bootstrap() {
     }),
   );
 
-  // Global Validation
+  // Global Validation (Ensure proper request format)
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -47,11 +47,11 @@ async function bootstrap() {
     }),
   );
 
-  // Global Guards
+  // Global Guards (for role-based access)
   const reflector = new Reflector();
   app.useGlobalGuards(new RolesGuard(reflector));
 
-  // Swagger Documentation
+  // Swagger Documentation Setup
   const config = new DocumentBuilder()
     .setTitle('Healthy Milk Products API')
     .setDescription('API for managing milk product orders')
@@ -59,27 +59,35 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
 
-  // ✅ Save Swagger JSON to `/tmp`, which is writable in Vercel
+  // 🚀 Fix: Ensure Swagger works on both Vercel and local development
+  SwaggerModule.setup('api', app, document, {
+    swaggerOptions: {
+      url: process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}/api-json`
+        : 'http://localhost:3000/api-json',
+    },
+  });
+
+  // ✅ Fix: Save Swagger JSON to `/tmp`, which is writable in Vercel
   const swaggerPath = join(tmpdir(), 'swagger-spec.json');
   fs.writeFileSync(swaggerPath, JSON.stringify(document, null, 2));
   console.log(`Swagger spec saved to: ${swaggerPath}`);
 
-  // Use the PORT environment variable for deployment, default to 3000 for local dev
+  // Set up the server port (default: 3000 for local development)
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`NestJS app is listening on http://localhost:${port}`);
+  console.log(`✅ NestJS API is live at: http://localhost:${port}/api`);
 
   isAppInitialized = true;
 }
 
-// ✅ Call bootstrap() immediately in dev mode
+// ✅ Fix: Call `bootstrap()` immediately for local development
 if (process.env.NODE_ENV !== 'production') {
   bootstrap().catch((err) => console.error('Error bootstrapping app:', err));
 }
 
-// ✅ Ensure Vercel recognizes this as a serverless function
+// ✅ Fix: Export as a serverless function for Vercel
 export default async function handler(req, res) {
   if (!isAppInitialized) {
     await bootstrap();
