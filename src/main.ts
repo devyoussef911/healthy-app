@@ -59,19 +59,14 @@ async function bootstrap() {
     paths: {},
   };
 
-  // Save Swagger JSON in `/tmp`
+  // ✅ Save Swagger JSON in `/tmp`
   const swaggerJsonPath = join(tmpdir(), 'swagger.json');
   fs.writeFileSync(swaggerJsonPath, JSON.stringify(swaggerDocument, null, 2));
 
-  // ✅ Fix: Use `expressApp.get()` instead of `app.get()`
+  // ✅ Serve Swagger JSON Dynamically
   expressApp.get('/swagger.json', (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(swaggerDocument);
-  });
-
-  // ✅ Fix: Use `expressApp.get()` to redirect `/api` to Swagger UI
-  expressApp.get('/api', (req, res) => {
-    res.redirect('/swagger/index.html');
   });
 
   // ✅ Serve Swagger UI as Static Files
@@ -79,6 +74,11 @@ async function bootstrap() {
     '/swagger',
     express.static(join(__dirname, '..', 'public', 'swagger')),
   );
+
+  // ✅ Redirect `/api` to Swagger UI
+  expressApp.get('/api', (req, res) => {
+    res.redirect('/swagger/index.html');
+  });
 
   // Start listening on the correct port
   const port = process.env.PORT || 3000;
